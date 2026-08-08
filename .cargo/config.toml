@@ -1,0 +1,3 @@
+[alias]
+kcheck = "check -p rand-kernel --target x86_64-unknown-none"
+kbuild = "build -p rand-kernel --target x86_64-unknown-none"

@@ -1,6 +1,13 @@
-[package]
-name = "randOS"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = [
+  "kernel",
+  "runner",
+]
+default-members = ["runner"]
 
-[dependencies]
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
