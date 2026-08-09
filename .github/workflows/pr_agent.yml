@@ -24,6 +24,7 @@ jobs:
           OPENAI.API_BASE: "https://opencode.ai/zen/go/v1"
           OPENAI.KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
           config.custom_model_max_tokens: "128000"
+          config.ai_timeout: "300"
           config.reasoning_effort: "medium"
 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
