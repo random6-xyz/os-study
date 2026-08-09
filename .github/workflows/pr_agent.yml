@@ -1,0 +1,45 @@
+name: PR Agent
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.author_association == 'MEMBER'))) }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    name: Run pr agent on every pull request, respond to user comments
+    steps:
+      - name: PR Agent action step
+        id: pragent
+        uses: the-pr-agent/pr-agent@main
+        env:
+          config.model: "openai/deepseek-v4-flash"
+          config.fallback_models: '["openai/deepseek-v4-pro"]'
+          OPENAI.API_BASE: "https://opencode.ai/zen/go/v1"
+          OPENAI.KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          config.custom_model_max_tokens: "128000"
+          config.reasoning_effort: "high"
+
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "false"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
+
+          pr_reviewer.extra_instructions: >-
+            This is an educational Rust OS project for learning OS fundamentals
+            (roadmap: docs/PLAN.md and docs/TODO.md). Focus on the correctness of
+            low-level OS concepts: unsafe Rust, inline assembly, IDT/IRQ handling,
+            context switching, and memory management. Explain the WHY behind each
+            issue and what the author should study, not just WHAT to change. Do not
+            demand production-grade hardening; keep suggestions proportionate to an
+            educational kernel. When relevant, check the change against the current
+            milestone in docs/TODO.md. Keep the review concise and structured with
+            markdown. Write all comments in English.
