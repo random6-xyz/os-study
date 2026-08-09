@@ -12,6 +12,7 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
+      contents: read
     name: Run pr agent on every pull request, respond to user comments
     steps:
       - name: PR Agent action step
