@@ -78,19 +78,19 @@ impl<T, const CAP: usize> CircularQueue<T, CAP> {
     /// the relative order of the remaining items. Returns `None` if no
     /// item matches.
     pub fn remove_if(&mut self, mut pred: impl FnMut(&T) -> bool) -> Option<T> {
-        if self.is_empty() {
-            return None;
-        }
-        for _ in 0..self.len {
+        let n = self.len;
+        let mut found = None;
+        for _ in 0..n {
             let item = self.pop_front()?;
-            if pred(&item) {
-                return Some(item);
+            if found.is_none() && pred(&item) {
+                found = Some(item);
+            } else {
+                // The queue cannot become full here: we only re-insert
+                // items that were just popped.
+                self.push_back(item).unwrap();
             }
-            // The queue cannot become full here: we only re-insert items
-            // that were just popped.
-            self.push_back(item).unwrap();
         }
-        None
+        found
     }
 
     /// Pops and returns the front item, or `None` if the queue is empty.

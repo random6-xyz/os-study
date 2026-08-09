@@ -30,7 +30,7 @@ pub fn spawn(entry: fn() -> !) {
             .as_mut()
             .expect("scheduler not initialized")
             .enqueue_task(task)
-            .unwrap();
+            .expect("ready queue full");
     });
 }
 
@@ -58,8 +58,12 @@ pub fn block_current() {
                 None => return, // idle loop: nothing to block
             };
             prev.change_state(TaskStatus::Blocked).unwrap();
-            let wait_q = wait.as_mut().unwrap();
-            wait_q.push_back(prev).unwrap();
+            let wait_q = wait
+                .as_mut()
+                .expect("wait queue not initialized");
+            wait_q
+                .push_back(prev)
+                .expect("wait queue full");
             let wait_back = wait_q.back_mut().unwrap();
             let prev_ptr = &mut wait_back.context as *mut TaskContext;
 
@@ -98,7 +102,7 @@ pub fn wake_up(pid: u16) {
 
         if let Some(mut task) = wait_q.remove_if(|t| t.pid == pid) {
             task.change_state(TaskStatus::Ready).unwrap();
-            sched.enqueue_task(task).unwrap();
+            sched.enqueue_task(task).expect("ready queue full");
         }
     });
 }

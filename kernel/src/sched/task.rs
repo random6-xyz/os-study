@@ -102,7 +102,7 @@ impl TaskStruct {
         }
     }
 
-    pub fn destory(&mut self) -> Result<(), TaskError> {
+    pub fn destroy(&mut self) -> Result<(), TaskError> {
         self.status = TaskStatus::Terminated;
 
         return Ok(());

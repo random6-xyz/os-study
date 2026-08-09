@@ -72,12 +72,17 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     heap_test();
 
-    // Initialize the global scheduler and spawn three tasks.
-    *crate::sched::SCHEDULER.lock() = Some(crate::sched::fifo::Scheduler::init(SchedType::FIFO));
-    *crate::sched::WAIT_QUEUE.lock() = Some(CircularQueue::new());
-    crate::sched::spawn(task_a);
-    crate::sched::spawn(task_b);
-    crate::sched::spawn(task_c);
+    // Initialize the global scheduler and spawn three tasks. Interrupts
+    // stay off here: a timer IRQ arriving mid-lock would spin forever on
+    // the same scheduler mutex inside `schedule`.
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        *crate::sched::SCHEDULER.lock() =
+            Some(crate::sched::fifo::Scheduler::init(SchedType::FIFO));
+        *crate::sched::WAIT_QUEUE.lock() = Some(CircularQueue::new());
+        crate::sched::spawn(task_a);
+        crate::sched::spawn(task_b);
+        crate::sched::spawn(task_c);
+    });
 
     // Second-based tick logger: the PIT fires at 100 Hz, so the
     // counter grows by 100 every second.
