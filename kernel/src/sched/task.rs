@@ -116,12 +116,7 @@ impl TaskStruct {
     }
 
     pub fn change_state(&mut self, status: TaskStatus) -> Result<(), TaskError> {
-        crate::serial_println!(
-            "[TASK] pid {}: {:?} -> {:?}",
-            self.pid,
-            self.status,
-            status
-        );
+        crate::serial_println!("[TASK] pid {}: {:?} -> {:?}", self.pid, self.status, status);
         self.status = status;
         Ok(())
     }

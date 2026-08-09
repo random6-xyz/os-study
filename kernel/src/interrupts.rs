@@ -43,7 +43,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
     // Preempt the current context (task or idle loop) and run the next
     // task from the ready queue. Interrupts are disabled here (interrupt
     // gate), so the scheduler cannot be re-entered.
-    crate::sched::fifo::schedule(core::ptr::addr_of_mut!(crate::IDLE_CTX));
+    crate::sched::schedule(core::ptr::addr_of_mut!(crate::IDLE_CTX));
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {

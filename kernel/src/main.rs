@@ -6,14 +6,10 @@
 extern crate alloc;
 
 use alloc::{boxed::Box, format, vec::Vec};
-use bootloader_api::{entry_point, BootInfo};
+use bootloader_api::{BootInfo, entry_point};
 use core::panic::PanicInfo;
 
-use crate::sched::{
-    circular_queue::CircularQueue,
-    fifo::{self, SchedType},
-    task::TaskContext,
-};
+use crate::sched::{circular_queue::CircularQueue, fifo::SchedType, task::TaskContext};
 
 mod interrupts;
 mod memory;
@@ -29,37 +25,31 @@ entry_point!(kernel_main);
 /// current context when the timer preempts the idle loop itself.
 pub static mut IDLE_CTX: TaskContext = TaskContext { sp: 0 };
 
-fn task_a() -> ! {
+/// Shared task body: each spawned task prints its name in a loop and
+/// spins until the timer preempts it.
+fn task_loop(name: &str) -> ! {
     // The first switch into a task reaches the entry via `ret`, so the
     // IF flag (cleared by the IRQ0 interrupt gate) must be re-enabled
     // here; from then on the task runs with interrupts on.
     x86_64::instructions::interrupts::enable();
     loop {
-        serial_println!("[TASK-A] running");
+        serial_println!("[{name}] running");
         for _ in 0..200_000 {
             core::hint::spin_loop();
         }
     }
+}
+
+fn task_a() -> ! {
+    task_loop("TASK-A")
 }
 
 fn task_b() -> ! {
-    x86_64::instructions::interrupts::enable();
-    loop {
-        serial_println!("[TASK-B] running");
-        for _ in 0..200_000 {
-            core::hint::spin_loop();
-        }
-    }
+    task_loop("TASK-B")
 }
 
 fn task_c() -> ! {
-    x86_64::instructions::interrupts::enable();
-    loop {
-        serial_println!("[TASK-C] running");
-        for _ in 0..200_000 {
-            core::hint::spin_loop();
-        }
-    }
+    task_loop("TASK-C")
 }
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
@@ -83,11 +73,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     heap_test();
 
     // Initialize the global scheduler and spawn three tasks.
-    *fifo::SCHEDULER.lock() = Some(fifo::Scheduler::init(SchedType::FIFO));
-    *fifo::WAIT_QUEUE.lock() = Some(CircularQueue::new());
-    fifo::spawn(task_a);
-    fifo::spawn(task_b);
-    fifo::spawn(task_c);
+    *crate::sched::SCHEDULER.lock() = Some(crate::sched::fifo::Scheduler::init(SchedType::FIFO));
+    *crate::sched::WAIT_QUEUE.lock() = Some(CircularQueue::new());
+    crate::sched::spawn(task_a);
+    crate::sched::spawn(task_b);
+    crate::sched::spawn(task_c);
 
     // Second-based tick logger: the PIT fires at 100 Hz, so the
     // counter grows by 100 every second.
