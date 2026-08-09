@@ -10,8 +10,9 @@ use bootloader_api::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 
 use crate::sched::{
-    fifo::{SchedType, Scheduler},
-    task::TaskStruct,
+    circular_queue::CircularQueue,
+    fifo::{self, SchedType},
+    task::TaskContext,
 };
 
 mod interrupts;
@@ -23,6 +24,43 @@ mod sched;
 mod serial;
 
 entry_point!(kernel_main);
+
+/// Context of the idle loop (the main loop below). Used to save the
+/// current context when the timer preempts the idle loop itself.
+pub static mut IDLE_CTX: TaskContext = TaskContext { sp: 0 };
+
+fn task_a() -> ! {
+    // The first switch into a task reaches the entry via `ret`, so the
+    // IF flag (cleared by the IRQ0 interrupt gate) must be re-enabled
+    // here; from then on the task runs with interrupts on.
+    x86_64::instructions::interrupts::enable();
+    loop {
+        serial_println!("[TASK-A] running");
+        for _ in 0..200_000 {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+fn task_b() -> ! {
+    x86_64::instructions::interrupts::enable();
+    loop {
+        serial_println!("[TASK-B] running");
+        for _ in 0..200_000 {
+            core::hint::spin_loop();
+        }
+    }
+}
+
+fn task_c() -> ! {
+    x86_64::instructions::interrupts::enable();
+    loop {
+        serial_println!("[TASK-C] running");
+        for _ in 0..200_000 {
+            core::hint::spin_loop();
+        }
+    }
+}
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     serial::init();
@@ -44,8 +82,12 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     heap_test();
 
-    let mut scheduler = Scheduler::init(SchedType::FIFO);
-    let mut init_task = TaskStruct::new();
+    // Initialize the global scheduler and spawn three tasks.
+    *fifo::SCHEDULER.lock() = Some(fifo::Scheduler::init(SchedType::FIFO));
+    *fifo::WAIT_QUEUE.lock() = Some(CircularQueue::new());
+    fifo::spawn(task_a);
+    fifo::spawn(task_b);
+    fifo::spawn(task_c);
 
     // Second-based tick logger: the PIT fires at 100 Hz, so the
     // counter grows by 100 every second.

@@ -185,6 +185,10 @@ fn main() {
         }
         Verdict::Fail(reason) => {
             print_line(&format!("[runner] FAIL: {reason}"));
+            // `std::process::exit` skips destructors, so kill QEMU
+            // explicitly here; otherwise the child survives as a zombie
+            // and keeps the disk image file locked.
+            drop(qemu);
             std::process::exit(1);
         }
         Verdict::Observe(reason) => {
