@@ -35,12 +35,10 @@ jobs:
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
 
           pr_reviewer.extra_instructions: >-
-            This is an educational Rust OS project for learning OS fundamentals
-            (roadmap: docs/PLAN.md and docs/TODO.md). Focus on the correctness of
-            low-level OS concepts: unsafe Rust, inline assembly, IDT/IRQ handling,
-            context switching, and memory management. Explain the WHY behind each
-            issue and what the author should study, not just WHAT to change. Do not
-            demand production-grade hardening; keep suggestions proportionate to an
-            educational kernel. When relevant, check the change against the current
-            milestone in docs/TODO.md. Keep the review concise and structured with
-            markdown. Write all comments in English.
+            This is an educational Rust OS project for learning OS fundamentals.
+            Focus on the correctness of low-level OS concepts: unsafe Rust, inline
+            assembly, IDT/IRQ handling, context switching, and memory management.
+            Explain the WHY behind each issue and what the author should study, not
+            just WHAT to change. Do not demand production-grade hardening; keep
+            suggestions proportionate to an educational kernel. Keep the review
+            concise and structured with markdown. Write all comments in English.
