@@ -6,7 +6,7 @@
 extern crate alloc;
 
 use alloc::{boxed::Box, format, vec::Vec};
-use bootloader_api::{BootInfo, entry_point};
+use bootloader_api::{BootInfo, BootloaderConfig, entry_point};
 use core::panic::PanicInfo;
 
 use crate::sched::{circular_queue::CircularQueue, fifo::SchedType, task::TaskContext};
@@ -19,7 +19,16 @@ mod qemu;
 mod sched;
 mod serial;
 
-entry_point!(kernel_main);
+/// Bootloader configuration: map the whole physical memory into the
+/// virtual address space so the frame allocator can access arbitrary
+/// physical frames (Linux-style `page_offset_base` linear mapping).
+static BOOTLOADER_CONFIG: BootloaderConfig = {
+    let mut config = BootloaderConfig::new_default();
+    config.mappings.physical_memory = Some(bootloader_api::config::Mapping::new_default());
+    config
+};
+
+entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 /// Context of the idle loop (the main loop below). Used to save the
 /// current context when the timer preempts the idle loop itself.
@@ -71,6 +80,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     serial_println!("[TEST] breakpoint returned successfully");
 
     heap_test();
+    mem_test();
 
     // Initialize the global scheduler and spawn three tasks. Interrupts
     // stay off here: a timer IRQ arriving mid-lock would spin forever on
@@ -97,6 +107,71 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         // TODO: run usermode init process
         x86_64::instructions::hlt();
     }
+}
+
+/// Exercise the frame allocator: alloc/free, double free, and OOM.
+/// All failure paths are logged but never panic.
+fn mem_test() {
+    use memory::frame::{Frame, FrameError};
+
+    serial_println!(
+        "[MEM-TEST] free frames before: {}",
+        memory::free_frames()
+    );
+
+    // 1. Normal alloc: three frames in a row.
+    let f1 = memory::alloc_frame().expect("alloc f1");
+    let f2 = memory::alloc_frame().expect("alloc f2");
+    let f3 = memory::alloc_frame().expect("alloc f3");
+    serial_println!(
+        "[MEM-TEST] alloc ok: {:#x}, {:#x}, {:#x} ({} free left)",
+        f1.addr,
+        f2.addr,
+        f3.addr,
+        memory::free_frames()
+    );
+
+    // Frames must be distinct.
+    assert_ne!(f1, f2);
+    assert_ne!(f2, f3);
+
+    // 2. Normal free: release all three.
+    memory::dealloc_frame(f1).expect("free f1");
+    memory::dealloc_frame(f2).expect("free f2");
+    memory::dealloc_frame(f3).expect("free f3");
+    serial_println!(
+        "[MEM-TEST] free ok, {} free left (restored)",
+        memory::free_frames()
+    );
+
+    // 3. Double free: freeing f1 again must fail with DoubleFree.
+    match memory::dealloc_frame(f1) {
+        Err(FrameError::DoubleFree) => {
+            serial_println!("[MEM-TEST] double free ok: rejected");
+        }
+        other => panic!("expected DoubleFree, got {other:?}"),
+    }
+
+    // 4. Out-of-range free: a frame address outside the managed range.
+    match memory::dealloc_frame(Frame { addr: 0xdead_beef }) {
+        Err(FrameError::OutOfRange) => {
+            serial_println!("[MEM-TEST] out-of-range free ok: rejected");
+        }
+        other => panic!("expected OutOfRange, got {other:?}"),
+    }
+
+    // 5. OOM: allocate until the allocator runs out.
+    let mut count = 0usize;
+    loop {
+        match memory::alloc_frame() {
+            Ok(_) => count += 1,
+            Err(FrameError::OutOfMemory) => break,
+            Err(e) => panic!("unexpected alloc error: {e:?}"),
+        }
+    }
+    serial_println!("[MEM-TEST] OOM ok: exhausted after {count} frames");
+
+    serial_println!("[MEM-TEST] all frame allocator tests passed");
 }
 
 /// Exercise the global allocator: Box, Vec, and format! must work.
